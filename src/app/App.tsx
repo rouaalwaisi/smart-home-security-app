@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { LoginScreen } from "./components/login-screen";
 import { SignupScreen } from "./components/signup-screen";
 import { ForgotPasswordScreen } from "./components/forgot-password-screen";
+import { VerifyEmailScreen } from "./components/verify-email-screen";
 import { HomeDashboard } from "./components/home-dashboard";
 import { SecurityAlerts } from "./components/security-alerts";
 import { DeviceSettings } from "./components/device-settings";
@@ -12,61 +13,81 @@ import { NetworkInfo } from "./components/network-info";
 import { CloudLogs } from "./components/cloud-logs";
 import { SettingsScreen } from "./components/settings-screen";
 import { AutomationRules, AutomationRule } from "./components/automation-rules";
+import { supabase } from "../lib/supabase";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules">("login");
+  const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "verifyEmail" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules">("login");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [connectionMode, setConnectionMode] = useState<"internet" | "intranet">("internet");
   const [biometricEnabled, setBiometricEnabled] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
-  const [devices, setDevices] = useState<Device[]>([
-    {
-      id: "001",
-      name: "Temperature Sensor",
-      type: "temperature",
-      status: "online",
-      enabled: true,
-      batteryLevel: 87,
-      value: "22°C",
-      lastAccessed: Date.now()
-    }
-  ]);
+  const [verifyEmail, setVerifyEmail] = useState("");
+  const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [previousScreen, setPreviousScreen] = useState<"dashboard" | "deviceList">("dashboard");
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
 
-  const handleAddRule = (rule: Omit<AutomationRule, "id" | "createdAt">) => {
-    const newRule: AutomationRule = {
-      ...rule,
-      id: `rule-${Date.now()}`,
-      createdAt: new Date().toISOString()
+  // Check if user is already logged in on app start
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        const remembered = localStorage.getItem("rememberMe");
+        if (remembered === "true") {
+          await loadDevices(data.session.user.id);
+          setIsAuthenticated(true);
+          setCurrentScreen("dashboard");
+        }
+      }
     };
-    setAutomationRules([...automationRules, newRule]);
+    checkSession();
+  }, []);
+
+  const loadDevices = async (uid: string) => {
+    const { data, error } = await supabase
+      .from("iot_device")
+      .select("*")
+      .eq("user_id", uid);
+    if (!error && data) {
+      const mapped: Device[] = data.map((d: any) => ({
+        id: String(d.device_id),
+        name: d.device_name,
+        type: d.device_type,
+        status: d.device_status as "online" | "offline",
+        enabled: true,
+        batteryLevel: d.battery_level,
+        value: d.value,
+        lastAccessed: Date.now()
+      }));
+      setDevices(mapped);
+    }
   };
 
-  const handleDeleteRule = (id: string) => {
-    setAutomationRules(automationRules.filter(r => r.id !== id));
-  };
-
-  const handleToggleRule = (id: string) => {
-    setAutomationRules(automationRules.map(r => 
-      r.id === id ? { ...r, enabled: !r.enabled } : r
-    ));
-  };
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      await loadDevices(data.user.id);
+    }
     setIsAuthenticated(true);
     setCurrentScreen("dashboard");
   };
 
-  const handleSignup = () => {
-    setIsAuthenticated(true);
-    setCurrentScreen("dashboard");
+  const handleSignup = async () => {
+    await handleLogin();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("rememberMe");
+    localStorage.removeItem("rememberedEmail");
     setIsAuthenticated(false);
+    setDevices([]);
     setCurrentScreen("login");
+  };
+
+  const handleNavigateToVerify = (email: string) => {
+    setVerifyEmail(email);
+    setCurrentScreen("verifyEmail");
   };
 
   const navigateTo = (screen: "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules") => {
@@ -75,38 +96,48 @@ export default function App() {
     }
   };
 
-  const handleAddDevice = (deviceType: string, deviceName: string) => {
-    const newDevice: Device = {
-      id: `${Date.now()}`,
-      name: deviceName,
-      type: deviceType as Device["type"],
-      status: "online",
-      enabled: true,
-      batteryLevel: Math.floor(Math.random() * 30) + 70, // Random battery 70-100%
-      lastAccessed: Date.now()
-    };
-
-    // Add device-specific values
-    if (deviceType === "temperature") {
-      newDevice.value = `${Math.floor(Math.random() * 10) + 18}°C`;
-    } else if (deviceType === "motion") {
-      newDevice.value = "Clear";
-    } else if (deviceType === "light") {
-      newDevice.value = "Off";
-    } else if (deviceType === "door" || deviceType === "garage") {
-      newDevice.value = "Closed";
-    } else if (deviceType === "smoke") {
-      newDevice.value = "Normal";
-    } else if (deviceType === "siren") {
-      newDevice.value = "Silent";
+  const handleAddDevice = async (deviceType: string, deviceName: string) => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    const uid = userData.user.id;
+    let value: string | undefined = undefined;
+    if (deviceType === "temperature") value = `${Math.floor(Math.random() * 10) + 18}C`;
+    else if (deviceType === "motion") value = "Clear";
+    else if (deviceType === "light") value = "Off";
+    else if (deviceType === "door" || deviceType === "garage") value = "Closed";
+    else if (deviceType === "smoke") value = "Normal";
+    else if (deviceType === "siren") value = "Silent";
+    const { data, error } = await supabase
+      .from("iot_device")
+      .insert({
+        device_name: deviceName,
+        device_type: deviceType,
+        device_status: "online",
+        protocol_used: "MQTT",
+        encryption_type: "AES-128",
+        battery_level: Math.floor(Math.random() * 30) + 70,
+        value: value,
+        user_id: uid
+      })
+      .select()
+      .single();
+    if (!error && data) {
+      const newDevice: Device = {
+        id: String(data.device_id),
+        name: data.device_name,
+        type: data.device_type,
+        status: "online",
+        enabled: true,
+        batteryLevel: data.battery_level,
+        value: data.value,
+        lastAccessed: Date.now()
+      };
+      setDevices(prev => [...prev, newDevice]);
     }
-
-    setDevices([...devices, newDevice]);
     navigateTo("deviceList");
   };
 
   const handleDeviceClick = (device: Device) => {
-    // Update lastAccessed timestamp
     const updatedDevice = { ...device, lastAccessed: Date.now() };
     setDevices(devices.map(d => d.id === device.id ? updatedDevice : d));
     setSelectedDevice(updatedDevice);
@@ -115,7 +146,6 @@ export default function App() {
   };
 
   const handleDashboardDeviceClick = (device: Device) => {
-    // Update lastAccessed timestamp
     const updatedDevice = { ...device, lastAccessed: Date.now() };
     setDevices(devices.map(d => d.id === device.id ? updatedDevice : d));
     setSelectedDevice(updatedDevice);
@@ -123,36 +153,46 @@ export default function App() {
     navigateTo("deviceConfig");
   };
 
-  const handleUpdateDevice = (updatedDevice: Device) => {
+  const handleUpdateDevice = async (updatedDevice: Device) => {
+    await supabase.from("iot_device").update({ device_name: updatedDevice.name, device_status: updatedDevice.status }).eq("device_id", updatedDevice.id);
     setDevices(devices.map(d => d.id === updatedDevice.id ? updatedDevice : d));
     setSelectedDevice(updatedDevice);
   };
 
-  const handleRemoveDevice = (deviceId: string) => {
+  const handleRemoveDevice = async (deviceId: string) => {
+    await supabase.from("iot_device").delete().eq("device_id", deviceId);
     setDevices(devices.filter(d => d.id !== deviceId));
+  };
+
+  const handleAddRule = (rule: Omit<AutomationRule, "id" | "createdAt">) => {
+    const newRule: AutomationRule = { ...rule, id: `rule-${Date.now()}`, createdAt: new Date().toISOString() };
+    setAutomationRules([...automationRules, newRule]);
+  };
+
+  const handleDeleteRule = (id: string) => {
+    setAutomationRules(automationRules.filter(r => r.id !== id));
+  };
+
+  const handleToggleRule = (id: string) => {
+    setAutomationRules(automationRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
   };
 
   if (!isAuthenticated) {
     if (currentScreen === "signup") {
-      return (
-        <SignupScreen
-          onSignup={handleSignup}
-          onBackToLogin={() => setCurrentScreen("login")}
-        />
-      );
+      return <SignupScreen onSignup={handleSignup} onBackToLogin={() => setCurrentScreen("login")} />;
     }
     if (currentScreen === "forgotPassword") {
-      return (
-        <ForgotPasswordScreen
-          onBackToLogin={() => setCurrentScreen("login")}
-        />
-      );
+      return <ForgotPasswordScreen onBackToLogin={() => setCurrentScreen("login")} />;
+    }
+    if (currentScreen === "verifyEmail") {
+      return <VerifyEmailScreen email={verifyEmail} onVerified={handleLogin} onBack={() => setCurrentScreen("login")} />;
     }
     return (
       <LoginScreen
         onLogin={handleLogin}
         onNavigateToSignup={() => setCurrentScreen("signup")}
         onNavigateToForgotPassword={() => setCurrentScreen("forgotPassword")}
+        onNavigateToVerify={handleNavigateToVerify}
         biometricEnabled={biometricEnabled}
         rememberMe={rememberMe}
         onRememberMeChange={setRememberMe}
@@ -162,85 +202,16 @@ export default function App() {
 
   return (
     <>
-      {currentScreen === "dashboard" && (
-        <HomeDashboard 
-          onNavigateToAlerts={() => navigateTo("alerts")}
-          onNavigateToDevice={() => navigateTo("device")}
-          onNavigateToDeviceList={() => navigateTo("deviceList")}
-          onNavigateToNetworkInfo={() => navigateTo("networkInfo")}
-          onNavigateToCloudLogs={() => navigateTo("cloudLogs")}
-          onNavigateToSettings={() => navigateTo("settings")}
-          onNavigateToAutomationRules={() => navigateTo("automationRules")}
-          onLogout={handleLogout}
-          devices={devices}
-          onDeviceClick={handleDashboardDeviceClick}
-          connectionMode={connectionMode}
-          onConnectionModeChange={setConnectionMode}
-        />
-      )}
-      {currentScreen === "alerts" && (
-        <SecurityAlerts 
-          onNavigateToDashboard={() => navigateTo("dashboard")}
-          onLogout={handleLogout}
-        />
-      )}
-      {currentScreen === "device" && (
-        <DeviceSettings 
-          onNavigateBack={() => navigateTo("dashboard")}
-        />
-      )}
-      {currentScreen === "deviceList" && (
-        <DeviceList
-          onNavigateToDashboard={() => navigateTo("dashboard")}
-          onAddDevice={() => navigateTo("addDevice")}
-          onDeviceClick={handleDeviceClick}
-          onLogout={handleLogout}
-          devices={devices}
-        />
-      )}
-      {currentScreen === "addDevice" && (
-        <AddDevice
-          onNavigateBack={() => navigateTo("deviceList")}
-          onAddDevice={handleAddDevice}
-        />
-      )}
-      {currentScreen === "deviceConfig" && selectedDevice && (
-        <DeviceConfig
-          device={selectedDevice}
-          onNavigateBack={() => navigateTo(previousScreen)}
-          onUpdateDevice={handleUpdateDevice}
-          onRemoveDevice={handleRemoveDevice}
-        />
-      )}
-      {currentScreen === "networkInfo" && (
-        <NetworkInfo
-          onNavigateBack={() => navigateTo("dashboard")}
-          connectionMode={connectionMode}
-        />
-      )}
-      {currentScreen === "cloudLogs" && (
-        <CloudLogs
-          onNavigateBack={() => navigateTo("dashboard")}
-          connectionMode={connectionMode}
-        />
-      )}
-      {currentScreen === "settings" && (
-        <SettingsScreen
-          onNavigateBack={() => navigateTo("dashboard")}
-          biometricEnabled={biometricEnabled}
-          onBiometricChange={setBiometricEnabled}
-        />
-      )}
-      {currentScreen === "automationRules" && (
-        <AutomationRules
-          onNavigateBack={() => navigateTo("dashboard")}
-          devices={devices}
-          rules={automationRules}
-          onAddRule={handleAddRule}
-          onDeleteRule={handleDeleteRule}
-          onToggleRule={handleToggleRule}
-        />
-      )}
+      {currentScreen === "dashboard" && <HomeDashboard onNavigateToAlerts={() => navigateTo("alerts")} onNavigateToDevice={() => navigateTo("device")} onNavigateToDeviceList={() => navigateTo("deviceList")} onNavigateToNetworkInfo={() => navigateTo("networkInfo")} onNavigateToCloudLogs={() => navigateTo("cloudLogs")} onNavigateToSettings={() => navigateTo("settings")} onNavigateToAutomationRules={() => navigateTo("automationRules")} onLogout={handleLogout} devices={devices} onDeviceClick={handleDashboardDeviceClick} connectionMode={connectionMode} onConnectionModeChange={setConnectionMode} />}
+      {currentScreen === "alerts" && <SecurityAlerts onNavigateToDashboard={() => navigateTo("dashboard")} onLogout={handleLogout} />}
+      {currentScreen === "device" && <DeviceSettings onNavigateBack={() => navigateTo("dashboard")} />}
+      {currentScreen === "deviceList" && <DeviceList onNavigateToDashboard={() => navigateTo("dashboard")} onAddDevice={() => navigateTo("addDevice")} onDeviceClick={handleDeviceClick} onLogout={handleLogout} devices={devices} />}
+      {currentScreen === "addDevice" && <AddDevice onNavigateBack={() => navigateTo("deviceList")} onAddDevice={handleAddDevice} />}
+      {currentScreen === "deviceConfig" && selectedDevice && <DeviceConfig device={selectedDevice} onNavigateBack={() => navigateTo(previousScreen)} onUpdateDevice={handleUpdateDevice} onRemoveDevice={handleRemoveDevice} />}
+      {currentScreen === "networkInfo" && <NetworkInfo onNavigateBack={() => navigateTo("dashboard")} connectionMode={connectionMode} />}
+      {currentScreen === "cloudLogs" && <CloudLogs onNavigateBack={() => navigateTo("dashboard")} connectionMode={connectionMode} />}
+      {currentScreen === "settings" && <SettingsScreen onNavigateBack={() => navigateTo("dashboard")} biometricEnabled={biometricEnabled} onBiometricChange={setBiometricEnabled} />}
+      {currentScreen === "automationRules" && <AutomationRules onNavigateBack={() => navigateTo("dashboard")} devices={devices} rules={automationRules} onAddRule={handleAddRule} onDeleteRule={handleDeleteRule} onToggleRule={handleToggleRule} />}
     </>
   );
 }
