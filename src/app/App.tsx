@@ -27,7 +27,6 @@ export default function App() {
   const [previousScreen, setPreviousScreen] = useState<"dashboard" | "deviceList">("dashboard");
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
 
-  // Check if user is already logged in on app start
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -35,6 +34,7 @@ export default function App() {
         const remembered = localStorage.getItem("rememberMe");
         if (remembered === "true") {
           await loadDevices(data.session.user.id);
+          await loadRules(data.session.user.id);
           setIsAuthenticated(true);
           setCurrentScreen("dashboard");
         }
@@ -63,10 +63,38 @@ export default function App() {
     }
   };
 
+  const loadRules = async (uid: string) => {
+    const { data, error } = await supabase
+      .from("automation_rules")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false });
+    if (!error && data) {
+      const mapped: AutomationRule[] = data.map((r: any) => ({
+        id: String(r.rule_id),
+        name: r.name,
+        enabled: r.enabled,
+        trigger: {
+          deviceId: r.trigger_device_id,
+          deviceName: r.trigger_device_name,
+          condition: r.trigger_condition
+        },
+        action: {
+          deviceId: r.action_device_id,
+          deviceName: r.action_device_name,
+          command: r.action_command
+        },
+        createdAt: r.created_at
+      }));
+      setAutomationRules(mapped);
+    }
+  };
+
   const handleLogin = async () => {
     const { data } = await supabase.auth.getUser();
     if (data.user) {
       await loadDevices(data.user.id);
+      await loadRules(data.user.id);
     }
     setIsAuthenticated(true);
     setCurrentScreen("dashboard");
@@ -82,6 +110,7 @@ export default function App() {
     localStorage.removeItem("rememberedEmail");
     setIsAuthenticated(false);
     setDevices([]);
+    setAutomationRules([]);
     setCurrentScreen("login");
   };
 
@@ -164,16 +193,54 @@ export default function App() {
     setDevices(devices.filter(d => d.id !== deviceId));
   };
 
-  const handleAddRule = (rule: Omit<AutomationRule, "id" | "createdAt">) => {
-    const newRule: AutomationRule = { ...rule, id: `rule-${Date.now()}`, createdAt: new Date().toISOString() };
-    setAutomationRules([...automationRules, newRule]);
+  const handleAddRule = async (rule: Omit<AutomationRule, "id" | "createdAt">) => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    const { data, error } = await supabase
+      .from("automation_rules")
+      .insert({
+        user_id: userData.user.id,
+        name: rule.name,
+        enabled: rule.enabled,
+        trigger_device_id: rule.trigger.deviceId,
+        trigger_device_name: rule.trigger.deviceName,
+        trigger_condition: rule.trigger.condition,
+        action_device_id: rule.action.deviceId,
+        action_device_name: rule.action.deviceName,
+        action_command: rule.action.command,
+      })
+      .select()
+      .single();
+    if (!error && data) {
+      const newRule: AutomationRule = {
+        id: String(data.rule_id),
+        name: data.name,
+        enabled: data.enabled,
+        trigger: {
+          deviceId: data.trigger_device_id,
+          deviceName: data.trigger_device_name,
+          condition: data.trigger_condition
+        },
+        action: {
+          deviceId: data.action_device_id,
+          deviceName: data.action_device_name,
+          command: data.action_command
+        },
+        createdAt: data.created_at
+      };
+      setAutomationRules(prev => [...prev, newRule]);
+    }
   };
 
-  const handleDeleteRule = (id: string) => {
+  const handleDeleteRule = async (id: string) => {
+    await supabase.from("automation_rules").delete().eq("rule_id", id);
     setAutomationRules(automationRules.filter(r => r.id !== id));
   };
 
-  const handleToggleRule = (id: string) => {
+  const handleToggleRule = async (id: string) => {
+    const rule = automationRules.find(r => r.id === id);
+    if (!rule) return;
+    await supabase.from("automation_rules").update({ enabled: !rule.enabled }).eq("rule_id", id);
     setAutomationRules(automationRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
   };
 
