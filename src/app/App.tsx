@@ -68,7 +68,8 @@ export default function App() {
         enabled: true,
         batteryLevel: d.battery_level,
         value: d.value,
-        lastAccessed: Date.now()
+        lastAccessed: Date.now(),
+        hardware_id: d.hardware_id
       }));
       setDevices(mapped);
     }
@@ -134,7 +135,7 @@ export default function App() {
     if (isAuthenticated) setCurrentScreen(screen);
   };
 
-  const handleAddDevice = async (deviceType: string, deviceName: string) => {
+  const handleAddDevice = async (deviceType: string, deviceName: string, hardwareId: string) => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
     const uid = userData.user.id;
@@ -145,6 +146,7 @@ export default function App() {
     else if (deviceType === "door" || deviceType === "garage") value = "Closed";
     else if (deviceType === "smoke") value = "Normal";
     else if (deviceType === "siren") value = "Silent";
+
     const { data, error } = await supabase
       .from("iot_device")
       .insert({
@@ -155,10 +157,12 @@ export default function App() {
         encryption_type: "AES-128",
         battery_level: Math.floor(Math.random() * 30) + 70,
         value: value,
-        user_id: uid
+        user_id: uid,
+        hardware_id: hardwareId
       })
       .select()
       .single();
+
     if (!error && data) {
       const newDevice: Device = {
         id: String(data.device_id),
@@ -168,7 +172,8 @@ export default function App() {
         enabled: true,
         batteryLevel: data.battery_level,
         value: data.value,
-        lastAccessed: Date.now()
+        lastAccessed: Date.now(),
+        hardware_id: data.hardware_id
       };
       setDevices(prev => [...prev, newDevice]);
     }
@@ -192,7 +197,9 @@ export default function App() {
   };
 
   const handleUpdateDevice = async (updatedDevice: Device) => {
-    await supabase.from("iot_device").update({ device_name: updatedDevice.name, device_status: updatedDevice.status }).eq("device_id", updatedDevice.id);
+    await supabase.from("iot_device")
+      .update({ device_name: updatedDevice.name, device_status: updatedDevice.status })
+      .eq("device_id", updatedDevice.id);
     setDevices(devices.map(d => d.id === updatedDevice.id ? updatedDevice : d));
     setSelectedDevice(updatedDevice);
   };

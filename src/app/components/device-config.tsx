@@ -120,22 +120,23 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
     setCommandError("");
     try {
       const { data, error } = await supabase.functions.invoke("send-device-command", {
-        body: { device_id: device.id, action }
+        body: {
+          device_id: device.hardware_id || device.id,
+          action
+        }
       });
       console.log("Command result:", data, error);
       if (error) {
-        console.error("Error:", JSON.stringify(error));
         setCommandError(error.message || "Unknown error");
         setCommandStatus("error");
       } else {
         setCommandStatus("sent");
       }
     } catch (err: any) {
-      console.error("Catch error:", err);
       setCommandError(err.message || "Unknown error");
       setCommandStatus("error");
     }
-    setTimeout(() => { setCommandStatus(null); setCommandError(""); }, 5000);
+    setTimeout(() => { setCommandStatus(null); setCommandError(""); }, 3000);
   };
 
   return (
@@ -155,6 +156,9 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
             <div>
               <h1 className="text-white mb-1">{device.name}</h1>
               <p className="text-blue-200/70">Device Settings & Configuration</p>
+              {device.hardware_id && (
+                <p className="text-blue-200/50 text-xs mt-1">Hardware ID: {device.hardware_id}</p>
+              )}
             </div>
           </div>
         </div>
@@ -171,7 +175,7 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
                   </div>
                   <div>
                     <p className="text-sm text-blue-200/70">Device ID</p>
-                    <p className="text-white">{device.id}</p>
+                    <p className="text-white">{device.hardware_id || device.id}</p>
                   </div>
                 </div>
               </div>

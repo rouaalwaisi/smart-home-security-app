@@ -3,14 +3,14 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { 
-  ArrowLeft, Thermometer, Activity, Lightbulb, 
+import {
+  ArrowLeft, Thermometer, Activity, Lightbulb,
   DoorOpen, Flame, Home, Bell, Check, Plus
 } from "lucide-react";
 
 interface AddDeviceProps {
   onNavigateBack: () => void;
-  onAddDevice: (deviceType: string, deviceName: string) => void;
+  onAddDevice: (deviceType: string, deviceName: string, hardwareId: string) => void;
 }
 
 const deviceTypes = [
@@ -26,9 +26,11 @@ const deviceTypes = [
 export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState("");
+  const [hardwareId, setHardwareId] = useState("");
   const [customDeviceType, setCustomDeviceType] = useState("");
   const [step, setStep] = useState<"select" | "configure">("select");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSelectType = (type: string) => {
     setSelectedType(type);
@@ -43,12 +45,24 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
   };
 
   const handleAddDevice = async () => {
-    if (!selectedType || !deviceName.trim()) return;
+    setError("");
+    if (!selectedType || !deviceName.trim()) {
+      setError("Please enter a device name");
+      return;
+    }
+    if (!hardwareId.trim()) {
+      setError("Please enter the hardware device ID (e.g., esp01)");
+      return;
+    }
+    if (selectedType === "custom" && !customDeviceType.trim()) {
+      setError("Please enter the device type");
+      return;
+    }
     setLoading(true);
-    if (selectedType === "custom" && customDeviceType.trim()) {
-      await onAddDevice(customDeviceType.trim(), deviceName);
-    } else if (selectedType !== "custom") {
-      await onAddDevice(selectedType, deviceName);
+    if (selectedType === "custom") {
+      await onAddDevice(customDeviceType.trim(), deviceName, hardwareId.trim());
+    } else {
+      await onAddDevice(selectedType, deviceName, hardwareId.trim());
     }
     setLoading(false);
   };
@@ -83,7 +97,7 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
 
         <div className="mb-8">
           <h1 className="text-white mb-2">{step === "select" ? "Add New Device" : "Configure Device"}</h1>
-          <p className="text-blue-200/70">{step === "select" ? "Select the type of device you want to add" : "Enter device name and configuration"}</p>
+          <p className="text-blue-200/70">{step === "select" ? "Select the type of device you want to add" : "Enter device details and configuration"}</p>
         </div>
 
         {step === "select" ? (
@@ -149,17 +163,22 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
               </Card>
             )}
 
+            {error && (
+              <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+                {error}
+              </div>
+            )}
+
             <Card className="bg-white/5 border-blue-400/20 backdrop-blur-sm p-6">
               <div className="space-y-4">
                 {selectedType === "custom" && (
                   <div>
                     <Label htmlFor="customDeviceType" className="text-blue-100">Device Type</Label>
                     <Input id="customDeviceType" type="text"
-                      placeholder="e.g., Smart Fan, Water Sensor, Camera"
+                      placeholder="e.g., Smart Fan, Water Sensor"
                       value={customDeviceType}
                       onChange={(e) => setCustomDeviceType(e.target.value)}
-                      className="mt-2 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50 focus:ring-blue-400/20" />
-                    <p className="text-xs text-blue-200/50 mt-2">Enter the type of device you want to add</p>
+                      className="mt-2 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50" />
                   </div>
                 )}
                 <div>
@@ -167,8 +186,16 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
                   <Input id="deviceName" type="text" placeholder="Enter device name"
                     value={deviceName}
                     onChange={(e) => setDeviceName(e.target.value)}
-                    className="mt-2 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50 focus:ring-blue-400/20" />
-                  <p className="text-xs text-blue-200/50 mt-2">Give your device a unique name for easy identification</p>
+                    className="mt-2 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50" />
+                  <p className="text-xs text-blue-200/50 mt-1">Give your device a unique name for easy identification</p>
+                </div>
+                <div>
+                  <Label htmlFor="hardwareId" className="text-blue-100">Hardware Device ID</Label>
+                  <Input id="hardwareId" type="text" placeholder="e.g., esp01, esp02, sensor01"
+                    value={hardwareId}
+                    onChange={(e) => setHardwareId(e.target.value)}
+                    className="mt-2 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50" />
+                  <p className="text-xs text-blue-200/50 mt-1">The unique ID of your physical IoT device (e.g., esp01, sensor01)</p>
                 </div>
               </div>
             </Card>
@@ -188,7 +215,7 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
             </Card>
 
             <Button onClick={handleAddDevice}
-              disabled={loading || !deviceName.trim() || (selectedType === "custom" && !customDeviceType.trim())}
+              disabled={loading || !deviceName.trim() || !hardwareId.trim() || (selectedType === "custom" && !customDeviceType.trim())}
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
               <Check className="w-5 h-5 mr-2" />
               {loading ? "Adding..." : "Add Device"}
