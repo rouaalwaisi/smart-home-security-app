@@ -1,7 +1,7 @@
-const AWS_IOT_ENDPOINT = "a2sar6zjc5pkxd-ats.iot.us-east-1.amazonaws.com";
+const AWS_IOT_ENDPOINT = Deno.env.get("AWS_IOT_ENDPOINT") ?? "";
 const AWS_REGION = "us-east-1";
-const AWS_ACCESS_KEY_ID = "AKIA3C2RJ2472JYKDHGD";
-const AWS_SECRET_ACCESS_KEY = "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";
+const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
+const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
 const AWS_IOT_TOPIC = "home/esp01/cmd";
 
 async function signRequest(method: string, url: string, body: string) {
