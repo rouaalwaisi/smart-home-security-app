@@ -18,6 +18,7 @@ import { supabase } from "../lib/supabase";
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "verifyEmail" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules">("login");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [connectionMode, setConnectionMode] = useState<"internet" | "intranet">("internet");
   const [biometricEnabled, setBiometricEnabled] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
@@ -41,6 +42,16 @@ export default function App() {
       }
     };
     checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsPasswordRecovery(true);
+        setIsAuthenticated(false);
+        setCurrentScreen("forgotPassword");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const loadDevices = async (uid: string) => {
@@ -120,9 +131,7 @@ export default function App() {
   };
 
   const navigateTo = (screen: "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules") => {
-    if (isAuthenticated) {
-      setCurrentScreen(screen);
-    }
+    if (isAuthenticated) setCurrentScreen(screen);
   };
 
   const handleAddDevice = async (deviceType: string, deviceName: string) => {
@@ -249,7 +258,10 @@ export default function App() {
       return <SignupScreen onSignup={handleSignup} onBackToLogin={() => setCurrentScreen("login")} />;
     }
     if (currentScreen === "forgotPassword") {
-      return <ForgotPasswordScreen onBackToLogin={() => setCurrentScreen("login")} />;
+      return <ForgotPasswordScreen
+        onBackToLogin={() => { setIsPasswordRecovery(false); setCurrentScreen("login"); }}
+        startAtPassword={isPasswordRecovery}
+      />;
     }
     if (currentScreen === "verifyEmail") {
       return <VerifyEmailScreen email={verifyEmail} onVerified={handleLogin} onBack={() => setCurrentScreen("login")} />;
