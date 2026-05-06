@@ -49,17 +49,14 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
   const handleAddDevice = async () => {
     const newErrors: { deviceName?: string; hardwareId?: string; customDeviceType?: string } = {};
 
-    const cleanDeviceName = sanitizeInput(deviceName);
-    const cleanHardwareId = sanitizeInput(hardwareId);
-    const cleanCustomType = sanitizeInput(customDeviceType);
-
-    const deviceNameError = validateDeviceName(cleanDeviceName);
+    // Validate first on raw input for correct error messages
+    const deviceNameError = validateDeviceName(deviceName);
     if (deviceNameError) newErrors.deviceName = deviceNameError;
 
-    const hardwareIdError = validateHardwareId(cleanHardwareId);
+    const hardwareIdError = validateHardwareId(hardwareId);
     if (hardwareIdError) newErrors.hardwareId = hardwareIdError;
 
-    if (selectedType === "custom" && !cleanCustomType.trim()) {
+    if (selectedType === "custom" && !customDeviceType.trim()) {
       newErrors.customDeviceType = "Device type is required";
     }
 
@@ -67,6 +64,11 @@ export function AddDevice({ onNavigateBack, onAddDevice }: AddDeviceProps) {
       setErrors(newErrors);
       return;
     }
+
+    // Then sanitize before saving
+    const cleanDeviceName = sanitizeInput(deviceName);
+    const cleanHardwareId = sanitizeInput(hardwareId);
+    const cleanCustomType = sanitizeInput(customDeviceType);
 
     setLoading(true);
     if (selectedType === "custom") {
