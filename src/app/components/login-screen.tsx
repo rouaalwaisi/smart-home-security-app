@@ -5,6 +5,7 @@ import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Mail, Lock, Shield, Fingerprint } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { validateEmail, checkRateLimit, recordLoginAttempt, sanitizeInput } from "../../lib/security";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -25,26 +26,44 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Sanitize inputs
+    const cleanEmail = sanitizeInput(email.toLowerCase());
+
+    // Validate email
+    const emailError = validateEmail(cleanEmail);
+    if (emailError) { setError(emailError); return; }
+
+    // Check rate limit
+    const rateLimitError = checkRateLimit(cleanEmail);
+    if (rateLimitError) { setError(rateLimitError); return; }
+
+    if (!password) { setError("Password is required"); return; }
+
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password,
     });
 
     setLoading(false);
 
     if (error) {
+      recordLoginAttempt(cleanEmail, false);
       if (error.message.toLowerCase().includes("email not confirmed")) {
-        await supabase.auth.resend({ type: "signup", email });
-        onNavigateToVerify(email);
+        await supabase.auth.resend({ type: "signup", email: cleanEmail });
+        onNavigateToVerify(cleanEmail);
+      } else if (error.message.toLowerCase().includes("invalid login credentials")) {
+        setError("Incorrect email or password. Please try again.");
       } else {
         setError(error.message);
       }
     } else {
+      recordLoginAttempt(cleanEmail, true);
       if (rememberMe) {
         localStorage.setItem("rememberMe", "true");
-        localStorage.setItem("rememberedEmail", email);
+        localStorage.setItem("rememberedEmail", cleanEmail);
       } else {
         localStorage.removeItem("rememberMe");
         localStorage.removeItem("rememberedEmail");
@@ -82,7 +101,7 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
               <Input id="email" type="email" placeholder="your.email@example.com" value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-11 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50 focus:ring-blue-400/20"
-                required />
+                required maxLength={254} />
             </div>
           </div>
           <div className="space-y-2">
@@ -92,7 +111,7 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
               <Input id="password" type="password" placeholder="Enter your password" value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="pl-11 bg-white/5 border-blue-400/20 text-white placeholder:text-blue-300/30 focus:border-blue-400/50 focus:ring-blue-400/20"
-                required />
+                required maxLength={128} />
             </div>
           </div>
           <div className="flex items-center space-x-2">
