@@ -112,10 +112,6 @@ export default function App() {
     setCurrentScreen("dashboard");
   };
 
-  const handleSignup = async () => {
-    await handleLogin();
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("rememberMe");
@@ -262,7 +258,11 @@ export default function App() {
 
   if (!isAuthenticated) {
     if (currentScreen === "signup") {
-      return <SignupScreen onSignup={handleSignup} onBackToLogin={() => setCurrentScreen("login")} />;
+      return <SignupScreen
+        onSignup={() => {}}
+        onBackToLogin={() => setCurrentScreen("login")}
+        onNavigateToVerify={handleNavigateToVerify}
+      />;
     }
     if (currentScreen === "forgotPassword") {
       return <ForgotPasswordScreen
@@ -271,7 +271,11 @@ export default function App() {
       />;
     }
     if (currentScreen === "verifyEmail") {
-      return <VerifyEmailScreen email={verifyEmail} onVerified={handleLogin} onBack={() => setCurrentScreen("login")} />;
+      return <VerifyEmailScreen
+        email={verifyEmail}
+        onVerified={handleLogin}
+        onBack={() => setCurrentScreen("login")}
+      />;
     }
     return (
       <LoginScreen

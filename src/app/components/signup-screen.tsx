@@ -9,9 +9,10 @@ import { validateEmail, validatePassword, validateName, sanitizeInput, getPasswo
 interface SignupScreenProps {
   onSignup: () => void;
   onBackToLogin: () => void;
+  onNavigateToVerify: (email: string) => void;
 }
 
-export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
+export function SignupScreen({ onSignup, onBackToLogin, onNavigateToVerify }: SignupScreenProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,11 +28,9 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
     e.preventDefault();
     setError("");
 
-    // Sanitize inputs
     const cleanName = sanitizeInput(name);
     const cleanEmail = sanitizeInput(email.toLowerCase());
 
-    // Validate inputs
     const nameError = validateName(cleanName);
     if (nameError) { setError(nameError); return; }
 
@@ -62,7 +61,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
         setError(error.message);
       }
     } else {
-      onSignup();
+      onNavigateToVerify(cleanEmail);
     }
   };
 
@@ -130,7 +129,6 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
               </button>
             </div>
 
-            {/* Password strength indicator */}
             {password.length > 0 && (
               <div className="space-y-1">
                 <div className="flex gap-1">
