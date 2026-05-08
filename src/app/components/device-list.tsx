@@ -27,6 +27,7 @@ export interface Device {
   batteryLevel?: number;
   value?: string | number;
   lastAccessed?: number;
+  hardware_id?: string;
 }
 
 interface DeviceListProps {
