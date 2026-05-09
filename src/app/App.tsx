@@ -10,13 +10,12 @@ import { DeviceList, Device } from "./components/device-list";
 import { AddDevice } from "./components/add-device";
 import { DeviceConfig } from "./components/device-config";
 import { NetworkInfo } from "./components/network-info";
-import { CloudLogs } from "./components/cloud-logs";
 import { SettingsScreen } from "./components/settings-screen";
 import { AutomationRules, AutomationRule } from "./components/automation-rules";
 import { supabase } from "../lib/supabase";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "verifyEmail" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules">("login");
+  const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "verifyEmail" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "settings" | "automationRules">("login");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [connectionMode, setConnectionMode] = useState<"internet" | "intranet">("internet");
@@ -127,7 +126,7 @@ export default function App() {
     setCurrentScreen("verifyEmail");
   };
 
-  const navigateTo = (screen: "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "cloudLogs" | "settings" | "automationRules") => {
+  const navigateTo = (screen: "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "settings" | "automationRules") => {
     if (isAuthenticated) setCurrentScreen(screen);
   };
 
@@ -292,14 +291,26 @@ export default function App() {
 
   return (
     <>
-      {currentScreen === "dashboard" && <HomeDashboard onNavigateToAlerts={() => navigateTo("alerts")} onNavigateToDevice={() => navigateTo("device")} onNavigateToDeviceList={() => navigateTo("deviceList")} onNavigateToNetworkInfo={() => navigateTo("networkInfo")} onNavigateToCloudLogs={() => navigateTo("cloudLogs")} onNavigateToSettings={() => navigateTo("settings")} onNavigateToAutomationRules={() => navigateTo("automationRules")} onLogout={handleLogout} devices={devices} onDeviceClick={handleDashboardDeviceClick} connectionMode={connectionMode} onConnectionModeChange={setConnectionMode} />}
+      {currentScreen === "dashboard" && <HomeDashboard
+        onNavigateToAlerts={() => navigateTo("alerts")}
+        onNavigateToDevice={() => navigateTo("device")}
+        onNavigateToDeviceList={() => navigateTo("deviceList")}
+        onNavigateToNetworkInfo={() => navigateTo("networkInfo")}
+        onNavigateToCloudLogs={() => {}}
+        onNavigateToSettings={() => navigateTo("settings")}
+        onNavigateToAutomationRules={() => navigateTo("automationRules")}
+        onLogout={handleLogout}
+        devices={devices}
+        onDeviceClick={handleDashboardDeviceClick}
+        connectionMode={connectionMode}
+        onConnectionModeChange={setConnectionMode}
+      />}
       {currentScreen === "alerts" && <SecurityAlerts onNavigateToDashboard={() => navigateTo("dashboard")} onLogout={handleLogout} />}
       {currentScreen === "device" && <DeviceSettings onNavigateBack={() => navigateTo("dashboard")} />}
       {currentScreen === "deviceList" && <DeviceList onNavigateToDashboard={() => navigateTo("dashboard")} onAddDevice={() => navigateTo("addDevice")} onDeviceClick={handleDeviceClick} onLogout={handleLogout} devices={devices} />}
       {currentScreen === "addDevice" && <AddDevice onNavigateBack={() => navigateTo("deviceList")} onAddDevice={handleAddDevice} />}
       {currentScreen === "deviceConfig" && selectedDevice && <DeviceConfig device={selectedDevice} onNavigateBack={() => navigateTo(previousScreen)} onUpdateDevice={handleUpdateDevice} onRemoveDevice={handleRemoveDevice} />}
       {currentScreen === "networkInfo" && <NetworkInfo onNavigateBack={() => navigateTo("dashboard")} connectionMode={connectionMode} />}
-      {currentScreen === "cloudLogs" && <CloudLogs onNavigateBack={() => navigateTo("dashboard")} connectionMode={connectionMode} />}
       {currentScreen === "settings" && <SettingsScreen onNavigateBack={() => navigateTo("dashboard")} biometricEnabled={biometricEnabled} onBiometricChange={setBiometricEnabled} />}
       {currentScreen === "automationRules" && <AutomationRules onNavigateBack={() => navigateTo("dashboard")} devices={devices} rules={automationRules} onAddRule={handleAddRule} onDeleteRule={handleDeleteRule} onToggleRule={handleToggleRule} />}
     </>
