@@ -125,7 +125,6 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
           action
         }
       });
-      console.log("Command result:", data, error);
       if (error) {
         setCommandError(error.message || "Unknown error");
         setCommandStatus("error");
@@ -179,9 +178,9 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
                   </div>
                 </div>
               </div>
-              <Separator className="bg-blue-400/20" />
               {device.batteryLevel !== undefined && (
                 <>
+                  <Separator className="bg-blue-400/20" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -197,9 +196,9 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
                         style={{ width: `${device.batteryLevel}%` }}></div>
                     </div>
                   </div>
-                  <Separator className="bg-blue-400/20" />
                 </>
               )}
+              <Separator className="bg-blue-400/20" />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${device.status === "online" ? "bg-emerald-500/20" : "bg-red-500/20"}`}>
@@ -222,31 +221,17 @@ export function DeviceConfig({ device, onNavigateBack, onUpdateDevice, onRemoveD
         <div className="mb-6">
           <h2 className="text-white mb-4">Security</h2>
           <Card className="bg-white/5 border-blue-400/20 backdrop-blur-sm p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-200/70">Last Key Rotation</p>
-                    <p className="text-white">November 20, 2025</p>
-                  </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-200/70">Encryption</p>
+                  <p className="text-white">AES-128 Enabled</p>
                 </div>
               </div>
-              <Separator className="bg-blue-400/20" />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-200/70">Encryption</p>
-                    <p className="text-white">AES-128 Enabled</p>
-                  </div>
-                </div>
-                <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded">Active</span>
-              </div>
+              <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded">Active</span>
             </div>
           </Card>
         </div>
