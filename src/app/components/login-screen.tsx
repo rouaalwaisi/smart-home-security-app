@@ -12,12 +12,13 @@ interface LoginScreenProps {
   onNavigateToSignup: () => void;
   onNavigateToForgotPassword: () => void;
   onNavigateToVerify: (email: string) => void;
+  onNavigateTo2FA: (email: string) => void;
   biometricEnabled: boolean;
   rememberMe: boolean;
   onRememberMeChange: (value: boolean) => void;
 }
 
-export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPassword, onNavigateToVerify, biometricEnabled, rememberMe, onRememberMeChange }: LoginScreenProps) {
+export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPassword, onNavigateToVerify, onNavigateTo2FA, biometricEnabled, rememberMe, onRememberMeChange }: LoginScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,14 +28,11 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
     e.preventDefault();
     setError("");
 
-    // Sanitize inputs
     const cleanEmail = sanitizeInput(email.toLowerCase());
 
-    // Validate email
     const emailError = validateEmail(cleanEmail);
     if (emailError) { setError(emailError); return; }
 
-    // Check rate limit
     const rateLimitError = checkRateLimit(cleanEmail);
     if (rateLimitError) { setError(rateLimitError); return; }
 
@@ -42,7 +40,7 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password,
     });
@@ -61,14 +59,31 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
       }
     } else {
       recordLoginAttempt(cleanEmail, true);
-      if (rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-        localStorage.setItem("rememberedEmail", cleanEmail);
+
+      // Check if 2FA is enabled
+      const twoFactorEnabled = data.user?.user_metadata?.two_factor_enabled;
+
+      if (twoFactorEnabled) {
+        // Sign out temporarily and send OTP
+        await supabase.auth.signOut();
+        await supabase.auth.signInWithOtp({ 
+          email: cleanEmail,
+          options: {
+            shouldCreateUser: false
+          }
+        });
+        onNavigateTo2FA(cleanEmail);
       } else {
-        localStorage.removeItem("rememberMe");
-        localStorage.removeItem("rememberedEmail");
+        // No 2FA — proceed normally
+        if (rememberMe) {
+          localStorage.setItem("rememberMe", "true");
+          localStorage.setItem("rememberedEmail", cleanEmail);
+        } else {
+          localStorage.removeItem("rememberMe");
+          localStorage.removeItem("rememberedEmail");
+        }
+        onLogin();
       }
-      onLogin();
     }
   };
 

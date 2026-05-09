@@ -3,6 +3,7 @@ import { LoginScreen } from "./components/login-screen";
 import { SignupScreen } from "./components/signup-screen";
 import { ForgotPasswordScreen } from "./components/forgot-password-screen";
 import { VerifyEmailScreen } from "./components/verify-email-screen";
+import { TwoFactorScreen } from "./components/two-factor-screen";
 import { HomeDashboard } from "./components/home-dashboard";
 import { SecurityAlerts } from "./components/security-alerts";
 import { DeviceSettings } from "./components/device-settings";
@@ -15,13 +16,14 @@ import { AutomationRules, AutomationRule } from "./components/automation-rules";
 import { supabase } from "../lib/supabase";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "verifyEmail" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "settings" | "automationRules">("login");
+  const [currentScreen, setCurrentScreen] = useState<"login" | "signup" | "forgotPassword" | "verifyEmail" | "twoFactor" | "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "settings" | "automationRules">("login");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [connectionMode, setConnectionMode] = useState<"internet" | "intranet">("internet");
   const [biometricEnabled, setBiometricEnabled] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
+  const [twoFactorEmail, setTwoFactorEmail] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [previousScreen, setPreviousScreen] = useState<"dashboard" | "deviceList">("dashboard");
@@ -124,6 +126,11 @@ export default function App() {
   const handleNavigateToVerify = (email: string) => {
     setVerifyEmail(email);
     setCurrentScreen("verifyEmail");
+  };
+
+  const handleNavigateTo2FA = (email: string) => {
+    setTwoFactorEmail(email);
+    setCurrentScreen("twoFactor");
   };
 
   const navigateTo = (screen: "dashboard" | "alerts" | "device" | "deviceList" | "addDevice" | "deviceConfig" | "networkInfo" | "settings" | "automationRules") => {
@@ -276,12 +283,21 @@ export default function App() {
         onBack={() => setCurrentScreen("login")}
       />;
     }
+    if (currentScreen === "twoFactor") {
+      return <TwoFactorScreen
+        email={twoFactorEmail}
+        onVerified={handleLogin}
+        onBack={() => setCurrentScreen("login")}
+        rememberMe={rememberMe}
+      />;
+    }
     return (
       <LoginScreen
         onLogin={handleLogin}
         onNavigateToSignup={() => setCurrentScreen("signup")}
         onNavigateToForgotPassword={() => setCurrentScreen("forgotPassword")}
         onNavigateToVerify={handleNavigateToVerify}
+        onNavigateTo2FA={handleNavigateTo2FA}
         biometricEnabled={biometricEnabled}
         rememberMe={rememberMe}
         onRememberMeChange={setRememberMe}

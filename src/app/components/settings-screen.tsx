@@ -45,6 +45,7 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
         name: data.user.user_metadata?.full_name || "User",
         email: data.user.email || ""
       });
+      setTwoFactorEnabled(data.user.user_metadata?.two_factor_enabled || false);
     }
   };
 
@@ -65,6 +66,21 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
       setShowEditProfileModal(false);
       setEditName("");
       showMessage("Profile updated successfully!", "success");
+    }
+  };
+
+  const handleToggle2FA = async () => {
+    const newValue = !twoFactorEnabled;
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({
+      data: { two_factor_enabled: newValue }
+    });
+    setLoading(false);
+    if (error) {
+      showMessage(error.message, "error");
+    } else {
+      setTwoFactorEnabled(newValue);
+      showMessage(`Two-factor authentication ${newValue ? "enabled" : "disabled"} successfully!`, "success");
     }
   };
 
@@ -124,7 +140,6 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
       setShowDeleteModal(false);
       return;
     }
-
     const result = await fetch(
       "https://giryekrfphmmebisivom.supabase.co/functions/v1/delete-user",
       {
@@ -135,10 +150,8 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
         }
       }
     ).then(r => r.json());
-
     setLoading(false);
     setShowDeleteModal(false);
-
     if (result.error) {
       showMessage(result.error, "error");
     } else {
@@ -237,10 +250,7 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
                     <p className="text-blue-200/50 text-xs">Send OTP to email on every login</p>
                   </div>
                 </div>
-                <button onClick={() => {
-                  setTwoFactorEnabled(!twoFactorEnabled);
-                  showMessage(`Two-factor authentication ${!twoFactorEnabled ? "enabled" : "disabled"} — coming in next update`, "success");
-                }}
+                <button onClick={handleToggle2FA} disabled={loading}
                   className={`w-12 h-6 rounded-full transition-all ${twoFactorEnabled ? "bg-blue-600" : "bg-white/20"}`}>
                   <div className={`w-5 h-5 rounded-full bg-white transition-all ${twoFactorEnabled ? "translate-x-6" : "translate-x-0.5"}`}></div>
                 </button>
@@ -334,7 +344,7 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
 
         <Card className="bg-white/5 border-blue-400/20 p-4 mb-6">
           <div className="text-center space-y-2">
-            <p className="text-blue-200/70 text-sm">Smart Home Security App</p>
+            <p className="text-blue-200/70 text-sm">Shaheen | شاهين</p>
             <p className="text-blue-200/50 text-xs">Version 1.0.0</p>
             <p className="text-blue-200/50 text-xs">Graduation Project © 2026</p>
           </div>
@@ -456,7 +466,7 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
                   <Trash2 className="w-8 h-8 text-red-400" />
                 </div>
                 <h2 className="text-white">Delete Account?</h2>
-                <p className="text-blue-200/70 text-sm mt-2">This action is permanent and cannot be undone. All your devices, logs and alerts will be deleted.</p>
+                <p className="text-blue-200/70 text-sm mt-2">This action is permanent and cannot be undone. All your data will be deleted.</p>
               </div>
               <div className="flex gap-3">
                 <Button onClick={() => setShowDeleteModal(false)} variant="outline"
