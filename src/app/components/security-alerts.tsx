@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { AlertTriangle, Shield, LogOut, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Shield, LogOut, ArrowLeft, Trash2, RefreshCw, Thermometer } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import {
   AlertDialog,
@@ -23,6 +23,7 @@ interface AIAlert {
   advice: string;
   category: string;
   subcategory: string;
+  type: string;
 }
 
 interface SecurityAlertsProps {
@@ -40,7 +41,6 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
 
   useEffect(() => {
     fetchAlerts();
-    // Auto-refresh every 10 seconds
     const interval = setInterval(fetchAlerts, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -80,22 +80,52 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
     setAlertToDelete(null);
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "high": return "border-l-red-500/50 bg-red-500/5";
-      case "medium": return "border-l-yellow-500/50 bg-yellow-500/5";
-      case "low": return "border-l-blue-500/50 bg-blue-500/5";
-      default: return "border-l-red-500/50 bg-red-500/5";
+  const getAlertIcon = (alert: AIAlert) => {
+    if (alert.type === "temperature") {
+      return <Thermometer className={`w-5 h-5 ${
+        alert.severity.toLowerCase() === "high" ? "text-red-400" :
+        alert.severity.toLowerCase() === "medium" ? "text-orange-400" :
+        "text-yellow-400"
+      }`} />;
     }
+    return <AlertTriangle className={`w-5 h-5 ${
+      alert.severity.toLowerCase() === "high" ? "text-red-400" :
+      alert.severity.toLowerCase() === "medium" ? "text-yellow-400" :
+      "text-blue-400"
+    }`} />;
   };
 
-  const getSeverityBadgeColor = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "high": return "text-red-400 bg-red-500/10";
-      case "medium": return "text-yellow-400 bg-yellow-500/10";
-      case "low": return "text-blue-400 bg-blue-500/10";
-      default: return "text-red-400 bg-red-500/10";
+  const getAlertIconBg = (alert: AIAlert) => {
+    if (alert.type === "temperature") {
+      return alert.severity.toLowerCase() === "high" ? "bg-red-500/20" :
+             alert.severity.toLowerCase() === "medium" ? "bg-orange-500/20" :
+             "bg-yellow-500/20";
     }
+    return alert.severity.toLowerCase() === "high" ? "bg-red-500/20" :
+           alert.severity.toLowerCase() === "medium" ? "bg-yellow-500/20" :
+           "bg-blue-500/20";
+  };
+
+  const getSeverityColor = (alert: AIAlert) => {
+    if (alert.type === "temperature") {
+      return alert.severity.toLowerCase() === "high" ? "border-l-red-500/50 bg-red-500/5" :
+             alert.severity.toLowerCase() === "medium" ? "border-l-orange-500/50 bg-orange-500/5" :
+             "border-l-yellow-500/50 bg-yellow-500/5";
+    }
+    return alert.severity.toLowerCase() === "high" ? "border-l-red-500/50 bg-red-500/5" :
+           alert.severity.toLowerCase() === "medium" ? "border-l-yellow-500/50 bg-yellow-500/5" :
+           "border-l-blue-500/50 bg-blue-500/5";
+  };
+
+  const getSeverityBadgeColor = (alert: AIAlert) => {
+    if (alert.type === "temperature") {
+      return alert.severity.toLowerCase() === "high" ? "text-red-400 bg-red-500/10" :
+             alert.severity.toLowerCase() === "medium" ? "text-orange-400 bg-orange-500/10" :
+             "text-yellow-400 bg-yellow-500/10";
+    }
+    return alert.severity.toLowerCase() === "high" ? "text-red-400 bg-red-500/10" :
+           alert.severity.toLowerCase() === "medium" ? "text-yellow-400 bg-yellow-500/10" :
+           "text-blue-400 bg-blue-500/10";
   };
 
   const formatTime = (timestamp: string) => {
@@ -130,7 +160,7 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
 
         <div className="mb-8">
           <h1 className="text-white mb-2">Security Alerts</h1>
-          <p className="text-blue-200/70">AI-powered threat detection for your smart home</p>
+          <p className="text-blue-200/70">AI-powered threat and environmental monitoring</p>
           {lastUpdated && (
             <p className="text-blue-200/40 text-xs mt-1">
               Last updated: {lastUpdated.toLocaleTimeString()} · Auto-refreshes every 10 seconds
@@ -138,7 +168,7 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
           )}
         </div>
 
-        <div className="flex gap-6 mb-6">
+        <div className="flex gap-6 mb-6 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500"></div>
             <span className="text-sm text-blue-200/70">High Severity</span>
@@ -151,6 +181,10 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
             <div className="w-3 h-3 rounded-full bg-blue-500"></div>
             <span className="text-sm text-blue-200/70">Low Severity</span>
           </div>
+          <div className="flex items-center gap-2">
+            <Thermometer className="w-3 h-3 text-orange-400" />
+            <span className="text-sm text-blue-200/70">Temperature Alert</span>
+          </div>
         </div>
 
         {loading ? (
@@ -160,25 +194,17 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
         ) : alerts.length === 0 ? (
           <Card className="bg-white/5 border-blue-400/20 p-12 text-center">
             <Shield className="w-16 h-16 text-blue-400/50 mx-auto mb-4" />
-            <p className="text-white mb-2">No threats detected</p>
-            <p className="text-blue-200/70 text-sm">Your smart home network appears secure. Alerts will appear here when the AI model detects an attack.</p>
+            <p className="text-white mb-2">No alerts detected</p>
+            <p className="text-blue-200/70 text-sm">Your smart home is secure. Alerts will appear here when detected.</p>
           </Card>
         ) : (
           <div className="space-y-4">
             {alerts.map((alert, index) => (
               <Card key={`${alert.device_id}-${alert.timestamp}-${index}`}
-                className={`backdrop-blur-sm p-5 border-l-4 border-t border-r border-b border-blue-400/20 transition-all hover:bg-white/10 ${getSeverityColor(alert.severity)}`}>
+                className={`backdrop-blur-sm p-5 border-l-4 border-t border-r border-b border-blue-400/20 transition-all hover:bg-white/10 ${getSeverityColor(alert)}`}>
                 <div className="flex items-start gap-4">
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    alert.severity.toLowerCase() === "high" ? "bg-red-500/20" :
-                    alert.severity.toLowerCase() === "medium" ? "bg-yellow-500/20" :
-                    "bg-blue-500/20"
-                  }`}>
-                    <AlertTriangle className={`w-5 h-5 ${
-                      alert.severity.toLowerCase() === "high" ? "text-red-400" :
-                      alert.severity.toLowerCase() === "medium" ? "text-yellow-400" :
-                      "text-blue-400"
-                    }`} />
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${getAlertIconBg(alert)}`}>
+                    {getAlertIcon(alert)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4 mb-2">
@@ -190,11 +216,11 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
                           <p className="text-sm text-blue-100">{alert.advice}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${getSeverityBadgeColor(alert.severity)}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${getSeverityBadgeColor(alert)}`}>
                             {alert.severity} Severity
                           </span>
                           <span className="text-xs text-blue-200/40 bg-blue-500/10 px-2 py-0.5 rounded">
-                            {alert.category}
+                            {alert.type === "temperature" ? "🌡️ Temperature" : alert.category}
                           </span>
                           {alert.subcategory && (
                             <span className="text-xs text-blue-200/40 bg-blue-500/10 px-2 py-0.5 rounded">
@@ -243,7 +269,7 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
               Dismiss Alert?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-blue-200/70 text-center">
-              Are you sure you want to dismiss this security alert? This will only hide it from your view.
+              Are you sure you want to dismiss this alert? This will only hide it from your view.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-col gap-3 mt-6 px-6 pb-6">

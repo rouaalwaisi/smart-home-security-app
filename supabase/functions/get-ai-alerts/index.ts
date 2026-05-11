@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
   try {
     const url = `https://dynamodb.${AWS_REGION}.amazonaws.com/`;
 
-    // No filter — get all records to debug
+    // Get all records
     const body = JSON.stringify({
       TableName: DYNAMODB_TABLE,
       Limit: 50
@@ -77,8 +77,6 @@ Deno.serve(async (req) => {
     });
 
     const responseText = await response.text();
-    console.log("DynamoDB response status:", response.status);
-    console.log("DynamoDB response body:", responseText);
 
     if (!response.ok) {
       return new Response(JSON.stringify({ error: responseText }), {
@@ -90,25 +88,44 @@ Deno.serve(async (req) => {
     const data = JSON.parse(responseText);
     const items = data.Items || [];
 
-    console.log("Total items found:", items.length);
-    if (items.length > 0) {
-      console.log("First item keys:", JSON.stringify(Object.keys(items[0])));
-      console.log("First item:", JSON.stringify(items[0]));
-    }
+    const alerts: any[] = [];
 
-    // Transform DynamoDB format to friendly format
-    const alerts = items.map((item: any) => ({
-      device_id: item.device_id?.S || "unknown",
-      timestamp: item.timestamp?.N
-        ? new Date(Number(item.timestamp.N) * 1000).toISOString()
-        : new Date().toISOString(),
-      title: item.friendly_alert?.M?.title?.S || item.prediction?.M?.title?.S || "Security Alert",
-      message: item.friendly_alert?.M?.message?.S || item.prediction?.M?.message?.S || "An anomaly was detected.",
-      severity: item.friendly_alert?.M?.severity?.S || item.prediction?.M?.severity?.S || "High",
-      advice: item.friendly_alert?.M?.advice?.S || item.prediction?.M?.advice?.S || "Check your devices.",
-      category: item.Category?.S || item.prediction?.M?.Category?.S || "Unknown",
-      subcategory: item.SubCategory?.S || item.prediction?.M?.SubCategory?.S || ""
-    }));
+    items.forEach((item: any) => {
+      const isAttack = item.prediction?.M?.alert_status?.S === "attack_detected";
+      const isTempAlert = item.temperature_alert?.M?.temperature_alert?.BOOL === true;
+
+      if (isAttack) {
+        alerts.push({
+          device_id: item.device_id?.S || "unknown",
+          timestamp: item.timestamp?.N
+            ? new Date(Number(item.timestamp.N) * 1000).toISOString()
+            : new Date().toISOString(),
+          title: item.prediction?.M?.friendly_alert?.M?.title?.S || "Security Alert",
+          message: item.prediction?.M?.friendly_alert?.M?.message?.S || "An anomaly was detected.",
+          severity: item.prediction?.M?.friendly_alert?.M?.severity?.S || "High",
+          advice: item.prediction?.M?.friendly_alert?.M?.advice?.S || "Check your devices.",
+          category: item.prediction?.M?.Category?.S || "Unknown",
+          subcategory: item.prediction?.M?.SubCategory?.S || "",
+          type: "attack"
+        });
+      }
+
+      if (isTempAlert) {
+        alerts.push({
+          device_id: item.device_id?.S || "unknown",
+          timestamp: item.timestamp?.N
+            ? new Date(Number(item.timestamp.N) * 1000).toISOString()
+            : new Date().toISOString(),
+          title: item.temperature_alert?.M?.temperature_title?.S || "Temperature Alert",
+          message: item.temperature_alert?.M?.temperature_message?.S || "Unusual temperature detected.",
+          severity: item.temperature_alert?.M?.temperature_severity?.S || "Medium",
+          advice: item.temperature_alert?.M?.temperature_advice?.S || "Check your temperature sensor.",
+          category: "Temperature",
+          subcategory: "",
+          type: "temperature"
+        });
+      }
+    });
 
     // Sort by timestamp descending
     alerts.sort((a: any, b: any) =>
