@@ -105,6 +105,15 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
 
   const handleBiometricAuth = async () => {
     try {
+      // Check if running on mobile (Capacitor) or web
+      const { Capacitor } = await import("@capacitor/core");
+      const isNative = Capacitor.isNativePlatform();
+
+      if (!isNative) {
+        setError("Biometric authentication is only available on the mobile app. Please login with email and password.");
+        return;
+      }
+
       // Check if we have saved credentials
       const { value: savedEmail } = await Preferences.get({ key: "biometric_email" });
       const { value: savedPassword } = await Preferences.get({ key: "biometric_password" });
@@ -114,7 +123,6 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
         return;
       }
 
-      // Try to use BiometricAuth if available
       try {
         const { BiometricAuth } = await import("@aparajita/capacitor-biometric-auth");
         await BiometricAuth.authenticate({
@@ -123,15 +131,10 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
           allowDeviceCredential: true,
         });
       } catch (biometricError: any) {
-        // If biometric not available (web), skip biometric check
-        if (!biometricError.message?.includes("not available") &&
-            !biometricError.message?.includes("not supported")) {
-          setError("Biometric authentication failed. Please try again.");
-          return;
-        }
+        setError("Biometric authentication failed. Please try again.");
+        return;
       }
 
-      // Login with saved credentials
       setLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
         email: savedEmail,
