@@ -236,8 +236,15 @@ export function SettingsScreen({ onNavigateBack, biometricEnabled, onBiometricCh
                     <p className="text-white">Biometric Authentication</p>
                     <p className="text-blue-200/50 text-xs">Use fingerprint or face ID</p>
                   </div>
-                </div>
-                <button onClick={() => onBiometricChange(!biometricEnabled)}
+                </div><button onClick={() => {
+                        onBiometricChange(!biometricEnabled);
+                        if (!biometricEnabled) {
+                          showMessage("Biometric login will be activated on your next login.", "success");
+                        } else {
+                          showMessage("Biometric login disabled.", "success");
+                        }
+                      }}
+                
                   className={`w-12 h-6 rounded-full transition-all ${biometricEnabled ? "bg-blue-600" : "bg-white/20"}`}>
                   <div className={`w-5 h-5 rounded-full bg-white transition-all ${biometricEnabled ? "translate-x-6" : "translate-x-0.5"}`}></div>
                 </button>
