@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -6,6 +6,7 @@ import { Checkbox } from "./ui/checkbox";
 import { Mail, Lock, Shield, Fingerprint } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { validateEmail, checkRateLimit, recordLoginAttempt, sanitizeInput } from "../../lib/security";
+import { Preferences } from "@capacitor/preferences";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -23,6 +24,20 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
+
+  useEffect(() => {
+    checkSavedCredentials();
+  }, []);
+
+  const checkSavedCredentials = async () => {
+    try {
+      const { value } = await Preferences.get({ key: "biometric_email" });
+      setHasSavedCredentials(!!value);
+    } catch {
+      setHasSavedCredentials(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,21 +75,22 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
     } else {
       recordLoginAttempt(cleanEmail, true);
 
-      // Check if 2FA is enabled
       const twoFactorEnabled = data.user?.user_metadata?.two_factor_enabled;
 
       if (twoFactorEnabled) {
-        // Sign out temporarily and send OTP
         await supabase.auth.signOut();
-        await supabase.auth.signInWithOtp({ 
+        await supabase.auth.signInWithOtp({
           email: cleanEmail,
-          options: {
-            shouldCreateUser: false
-          }
+          options: { shouldCreateUser: false }
         });
         onNavigateTo2FA(cleanEmail);
       } else {
-        // No 2FA — proceed normally
+        // Ask to save credentials for biometric if biometric is enabled
+        if (biometricEnabled) {
+          await Preferences.set({ key: "biometric_email", value: cleanEmail });
+          await Preferences.set({ key: "biometric_password", value: password });
+        }
+
         if (rememberMe) {
           localStorage.setItem("rememberMe", "true");
           localStorage.setItem("rememberedEmail", cleanEmail);
@@ -87,8 +103,53 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
     }
   };
 
-  const handleBiometricAuth = () => {
-    onLogin();
+  const handleBiometricAuth = async () => {
+    try {
+      // Check if we have saved credentials
+      const { value: savedEmail } = await Preferences.get({ key: "biometric_email" });
+      const { value: savedPassword } = await Preferences.get({ key: "biometric_password" });
+
+      if (!savedEmail || !savedPassword) {
+        setError("No saved credentials. Please login with email and password first.");
+        return;
+      }
+
+      // Try to use BiometricAuth if available
+      try {
+        const { BiometricAuth } = await import("@aparajita/capacitor-biometric-auth");
+        await BiometricAuth.authenticate({
+          reason: "Authenticate to access Shaheen",
+          cancelTitle: "Cancel",
+          allowDeviceCredential: true,
+        });
+      } catch (biometricError: any) {
+        // If biometric not available (web), skip biometric check
+        if (!biometricError.message?.includes("not available") &&
+            !biometricError.message?.includes("not supported")) {
+          setError("Biometric authentication failed. Please try again.");
+          return;
+        }
+      }
+
+      // Login with saved credentials
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: savedEmail,
+        password: savedPassword,
+      });
+      setLoading(false);
+
+      if (error) {
+        setError("Saved credentials are no longer valid. Please login with email and password.");
+        await Preferences.remove({ key: "biometric_email" });
+        await Preferences.remove({ key: "biometric_password" });
+        setHasSavedCredentials(false);
+      } else {
+        onLogin();
+      }
+    } catch (err: any) {
+      setError("Biometric authentication failed. Please login with email and password.");
+    }
   };
 
   return (
@@ -159,10 +220,16 @@ export function LoginScreen({ onLogin, onNavigateToSignup, onNavigateToForgotPas
               </div>
             </div>
             <Button type="button" variant="outline" onClick={handleBiometricAuth}
+              disabled={loading}
               className="w-full bg-white/5 border-blue-400/20 text-blue-100 hover:bg-white/10 hover:text-white hover:border-blue-400/40">
               <Fingerprint className="w-5 h-5 mr-2" />
-              Use Biometric Authentication
+              {hasSavedCredentials ? "Use Biometric Authentication" : "Setup Biometric Login"}
             </Button>
+            {hasSavedCredentials && (
+              <p className="text-xs text-blue-200/40 text-center mt-2">
+                Credentials saved — tap to authenticate with biometrics
+              </p>
+            )}
           </>
         )}
         <div className="mt-4 text-center">
