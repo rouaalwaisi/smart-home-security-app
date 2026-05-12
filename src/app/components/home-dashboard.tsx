@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Shield, Thermometer, Activity, Lightbulb, Lock, Bell, LogOut, Settings, Info, DoorOpen, Flame, Home as HomeIcon, BatteryMedium, Wifi, Globe, Zap } from "lucide-react";
 import { Device } from "./device-list";
+import { supabase } from "../../lib/supabase";
 
 const deviceIcons = {
   temperature: { icon: Thermometer, color: "orange" },
@@ -44,6 +45,28 @@ export function HomeDashboard({
   onConnectionModeChange
 }: HomeDashboardProps) {
   const [showNetworkModal, setShowNetworkModal] = React.useState(false);
+  const [liveTemperature, setLiveTemperature] = useState<string | null>(null);
+  const [liveHumidity, setLiveHumidity] = useState<string | null>(null);
+  const [tempLastUpdated, setTempLastUpdated] = useState<Date | null>(null);
+
+  useEffect(() => {
+    fetchTemperature();
+    const interval = setInterval(fetchTemperature, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchTemperature = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("get-temperature");
+      if (!error && data?.temperature) {
+        setLiveTemperature(data.temperature);
+        setLiveHumidity(data.humidity);
+        setTempLastUpdated(new Date());
+      }
+    } catch (err) {
+      console.error("Failed to fetch temperature:", err);
+    }
+  };
 
   const recentDevices = [...devices]
     .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))
@@ -63,6 +86,11 @@ export function HomeDashboard({
       indigo: "bg-indigo-500/20 text-indigo-400",
       red: "bg-red-500/20 text-red-400",
     }[color];
+
+    // Use live temperature for temperature devices
+    const displayValue = device.type === "temperature" && liveTemperature
+      ? liveTemperature
+      : device.value?.toString();
 
     return (
       <Card key={device.id}
@@ -85,29 +113,43 @@ export function HomeDashboard({
         </div>
         <div className="space-y-2">
           <p className="text-blue-200/70">{device.name}</p>
-          {device.type === "temperature" && device.value && (
+
+          {device.type === "temperature" && (
             <>
               <div className="flex items-baseline gap-2">
-                <span className="text-white text-5xl">{device.value.toString().replace('°C', '')}</span>
+                <span className="text-white text-5xl">
+                  {liveTemperature || displayValue?.toString().replace('°C', '').replace('C', '') || '--'}
+                </span>
                 <span className="text-blue-200/50 text-2xl">°C</span>
               </div>
+              {liveHumidity && (
+                <p className="text-blue-200/50 text-sm">💧 Humidity: {liveHumidity}%</p>
+              )}
               <div className="pt-2">
                 <div className="h-2 bg-blue-900/30 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
-                    style={{ width: `${(parseInt(device.value?.toString() || '0') / 40) * 100}%` }}></div>
+                    style={{ width: `${Math.min((parseFloat(liveTemperature || displayValue || '0') / 50) * 100, 100)}%` }}>
+                  </div>
                 </div>
               </div>
+              {tempLastUpdated && (
+                <p className="text-xs text-blue-200/30">
+                  Updated: {tempLastUpdated.toLocaleTimeString()}
+                </p>
+              )}
             </>
           )}
+
           {device.type === "motion" && (
             <div className="flex items-center gap-3">
-              <span className="text-white text-4xl">{device.value || "Clear"}</span>
-              <div className={`w-3 h-3 rounded-full ${device.value === "Active" ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`}></div>
+              <span className="text-white text-4xl">{displayValue || "Clear"}</span>
+              <div className={`w-3 h-3 rounded-full ${displayValue === "Active" ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`}></div>
             </div>
           )}
+
           {(device.type === "light" || device.type === "door" || device.type === "garage" || device.type === "smoke" || device.type === "siren") && (
             <div className="space-y-1">
-              <span className="text-white text-3xl">{device.value || "Unknown"}</span>
+              <span className="text-white text-3xl">{displayValue || "Unknown"}</span>
               {device.batteryLevel !== undefined && (
                 <div className="flex items-center gap-2 mt-2">
                   <BatteryMedium className="w-4 h-4 text-green-400" />
@@ -116,9 +158,10 @@ export function HomeDashboard({
               )}
             </div>
           )}
+
           {!["temperature", "motion", "light", "door", "garage", "smoke", "siren"].includes(device.type) && (
             <div className="space-y-1">
-              <span className="text-white text-3xl">{device.value || "Active"}</span>
+              <span className="text-white text-3xl">{displayValue || "Active"}</span>
               {device.batteryLevel !== undefined && (
                 <div className="flex items-center gap-2 mt-2">
                   <BatteryMedium className="w-4 h-4 text-green-400" />
@@ -127,6 +170,7 @@ export function HomeDashboard({
               )}
             </div>
           )}
+
           <p className="text-xs text-blue-300/50 pt-2">Click to view settings</p>
         </div>
       </Card>
@@ -136,13 +180,12 @@ export function HomeDashboard({
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a1628] via-[#1a2f4f] to-[#0a1628] p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Navigation Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
               <Shield className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white">Smart Home Security</span>
+            <span className="text-white">Shaheen | شاهين</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon"
@@ -252,7 +295,7 @@ export function HomeDashboard({
               </p>
               <p className={`${connectionMode === "internet" ? "text-emerald-200/70" : "text-yellow-200/70"} text-xs mt-1`}>
                 {connectionMode === "intranet"
-                  ? "Local gateway: 192.168.4.1 • No internet required"
+                  ? "Local gateway active • No internet required"
                   : "Cloud sync enabled • Remote access available"}
               </p>
             </div>
