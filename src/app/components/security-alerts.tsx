@@ -49,7 +49,13 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
     try {
       const { data, error } = await supabase.functions.invoke("get-ai-alerts");
       if (!error && data?.alerts) {
-        setAlerts(data.alerts);
+        // Filter out dismissed alerts
+        const dismissed = JSON.parse(localStorage.getItem("dismissed_alerts") || "[]");
+        const filtered = data.alerts.filter((a: AIAlert) => {
+          const key = `${a.device_id}-${a.timestamp}`;
+          return !dismissed.includes(key);
+        });
+        setAlerts(filtered);
         setLastUpdated(new Date());
       }
     } catch (err) {
@@ -72,6 +78,14 @@ export function SecurityAlerts({ onNavigateToDashboard, onLogout }: SecurityAler
 
   const handleDeleteConfirm = () => {
     if (alertToDelete) {
+      const dismissedKey = `${alertToDelete.device_id}-${alertToDelete.timestamp}`;
+      
+      // Save to localStorage
+      const dismissed = JSON.parse(localStorage.getItem("dismissed_alerts") || "[]");
+      dismissed.push(dismissedKey);
+      localStorage.setItem("dismissed_alerts", JSON.stringify(dismissed));
+      
+      // Remove from current view
       setAlerts(prev => prev.filter(a =>
         !(a.device_id === alertToDelete.device_id && a.timestamp === alertToDelete.timestamp)
       ));
