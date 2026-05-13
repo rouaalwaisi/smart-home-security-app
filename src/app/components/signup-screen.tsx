@@ -162,7 +162,7 @@ export function SignupScreen({ onSignup, onBackToLogin, onNavigateToVerify }: Si
                     {/[0-9]/.test(password) ? "✓" : "✗"} One number
                   </p>
                   <p className={/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "text-emerald-400" : ""}>
-                    {/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "✓" : "✗"} One special character
+                    {/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "✓" : "✗"} One special character (!@#$%^&*(),.?":{}|&lt;&gt;)
                   </p>
                 </div>
               </div>
